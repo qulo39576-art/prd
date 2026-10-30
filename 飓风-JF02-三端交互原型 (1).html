@@ -4124,7 +4124,7 @@ const valid=value=>{const v=normalize(value);return v.length<=254&&/^[a-z0-9.!#$
 const mask=value=>{const [name,domain]=normalize(value).split('@');return domain?name.slice(0,Math.min(2,name.length))+'***@'+domain:'—';};
 const policy={validMinutes:5,resendSeconds:60,emailDaily:10,ipHourly:20,wrongLimit:5};
 const state={requests:[],sequence:0};
-function send(value,purpose){const email=normalize(value),now=Date.now();if(!valid(email))return{error:'请输入正确的邮箱地址'};const latest=state.requests.filter(r=>r.email===email&&r.status==='成功').at(-1);if(latest&&now-latest.time<policy.resendSeconds*1000)return{error:'发送过于频繁，请在倒计时结束后重试'};if(state.requests.filter(r=>r.email===email&&r.time>now-86400000).length>=policy.emailDaily)return{error:'该邮箱今日验证码次数已达上限，请明日再试'};if(state.requests.filter(r=>r.time>now-3600000).length>=policy.ipHourly)return{error:'当前网络发送过于频繁，请稍后重试'};const number=++state.sequence,record={id:'MAIL-F-'+number,email,purpose,time:now,expiresAt:now+policy.validMinutes*60000,wrong:0,used:false,status:['failure','offline'].includes(N.demoResult())?'失败':'成功',code:String(123455+number).slice(-6)};state.requests.push(record);if(record.status==='失败')return{error:'邮件发送失败，请检查网络后重新获取',record};state.requests.filter(r=>r!==record&&r.email===email&&r.purpose===purpose).forEach(r=>r.superseded=true);return{record};}
+function send(value,purpose){if(!['注册验证','找回密码'].includes(purpose))return{error:'当前场景不支持邮件验证码'};const email=normalize(value),now=Date.now();if(!valid(email))return{error:'请输入正确的邮箱地址'};const latest=state.requests.filter(r=>r.email===email&&r.status==='成功').at(-1);if(latest&&now-latest.time<policy.resendSeconds*1000)return{error:'发送过于频繁，请在倒计时结束后重试'};if(state.requests.filter(r=>r.email===email&&r.time>now-86400000).length>=policy.emailDaily)return{error:'该邮箱今日验证码次数已达上限，请明日再试'};if(state.requests.filter(r=>r.time>now-3600000).length>=policy.ipHourly)return{error:'当前网络发送过于频繁，请稍后重试'};const number=++state.sequence,record={id:'MAIL-F-'+number,email,purpose,time:now,expiresAt:now+policy.validMinutes*60000,wrong:0,used:false,status:['failure','offline'].includes(N.demoResult())?'失败':'成功',code:String(123455+number).slice(-6)};state.requests.push(record);if(record.status==='失败')return{error:'邮件发送失败，请检查网络后重新获取',record};state.requests.filter(r=>r!==record&&r.email===email&&r.purpose===purpose).forEach(r=>r.superseded=true);return{record};}
 function verify(record,value,purpose,code){if(!record||record.email!==normalize(value)||record.purpose!==purpose)return'请先获取当前邮箱和用途的验证码';if(record.status!=='成功')return'邮件尚未发送成功，请重新获取';if(record.used||record.superseded)return'验证码已失效，请重新获取';if(Date.now()>record.expiresAt)return'验证码已过期，请重新获取';if(record.wrong>=policy.wrongLimit)return'验证码错误次数已达上限，请重新获取';if(!/^\d{6}$/.test(String(code||''))||record.code!==code){record.wrong++;return record.wrong>=policy.wrongLimit?'验证码错误次数已达上限，请重新获取':'验证码不正确';}return'';}
 N.emailAuth={normalize,valid,mask,policy,state,send,verify};
 })(window.N);
@@ -4390,16 +4390,17 @@ function aiRecords(){const body=box(),list=f().aiRecords||[];if(!list.length)bod
 
 function agreement(title){N.dialog(title,E('div',{class:'fa-agreement'},text('h3',title),mute('欢迎使用飓风短剧。以下为原型展示内容，正式文本以运营发布版本为准。'),...['账号信息用于登录和保存观看记录。','金币、会员与私信卡的权益以购买页面说明为准。','发布内容需经审核后展示，请勿发布违规或侵权内容。','我们尊重并保护个人信息，您可联系客服查询或更正。'].map(t=>text('p',t))),[{label:'我知道了'}]);}
 function authPage(){
- u().auth||={mode:'account',register:false,values:{agree:true}};
+ u().auth||={register:false,recover:false,values:{agree:true}};
  const a=u().auth,EA=N.emailAuth,body=E('div',{class:'fa-auth'}),controls={},err=E('p',{class:'fa-error',role:'alert'});
- if(a.mode==='phone'){a.mode='email';delete a.values.phone;a.request=null;}
- const purpose=a.register?'注册验证':'邮箱登录';
- body.append(text('h2',a.register?'注册账号':p().expired||u().authExpired?'登录已过期':'登录后继续'),mute('登录后可点赞、收藏、评论并领取福利'));
- if(!a.register)body.append(tabbar(['用户名登录','邮箱登录'],a.mode==='email'?'邮箱登录':'用户名登录',t=>{a.mode=t==='邮箱登录'?'email':'account';refresh();}));
- function field(key,label,type='text',placeholder=''){const input=E('input',{id:'fa-auth-'+key,type,placeholder,autocomplete:key==='password'?'current-password':key==='email'?'email':'off'});input.value=a.values[key]||'';input.addEventListener('input',()=>{a.values[key]=input.value;err.textContent='';});controls[key]=input;const wrap=E('div',{class:'fa-field'},E('label',{for:input.id},label),input);body.append(wrap);return wrap;}
- if(a.register||a.mode==='account')field('username','用户名','text','请输入用户名');
- if(a.register||a.mode==='email'){
-  field('email','邮箱','email','请输入邮箱地址');controls.email.maxLength=254;
+ const recovering=!!a.recover,registering=!!a.register&&!recovering,usesCode=registering||recovering,purpose=recovering?'找回密码':'注册验证';
+ const title=recovering?'找回密码':registering?'注册账号':p().expired||u().authExpired?'登录已过期':'登录后继续';
+ body.append(text('h2',title),mute(recovering?'验证注册邮箱后设置新密码，完成后重新登录':registering?'注册成功后创建账号，登录后保存你的内容记录':'使用用户名或注册邮箱和密码登录'));
+ function field(key,label,type='text',placeholder=''){const input=E('input',{id:'fa-auth-'+key,type,placeholder,autocomplete:key==='password'?(usesCode?'new-password':'current-password'):key==='confirm'?'new-password':key==='email'?'email':key==='identifier'?'username':'off'});input.value=a.values[key]||'';input.addEventListener('input',()=>{a.values[key]=input.value;err.textContent='';});controls[key]=input;const wrap=E('div',{class:'fa-field'},E('label',{for:input.id},label),input);body.append(wrap);return wrap;}
+ function change(mode,values={agree:true}){a.register=mode==='register';a.recover=mode==='recover';a.values=values;a.request=null;delete a.mode;refresh();}
+ if(!usesCode)field('identifier','用户名或邮箱','text','请输入用户名或注册邮箱');
+ if(registering)field('username','用户名','text','请输入用户名');
+ if(usesCode){
+  field('email','邮箱','email','请输入注册邮箱地址');controls.email.maxLength=254;
   const wrap=field('code','邮箱验证码','text','请输入6位验证码');controls.code.maxLength=6;controls.code.inputMode='numeric';
   const send=action('获取验证码',()=>{const result=EA.send(a.values.email,purpose);if(result.error){err.textContent=result.error;N.toast(result.error,'error');return;}a.request=result.record;a.values.email=EA.normalize(a.values.email);controls.email.value=a.values.email;err.textContent='';N.toast('演示邮件验证码：'+a.request.code,'info');update();},'fa-send-code');
   wrap.classList.add('fa-code-field');wrap.append(send);
@@ -4407,25 +4408,44 @@ function authPage(){
   update();const tick=setInterval(()=>{if(!send.isConnected){clearInterval(tick);return;}update();},1000);
   body.append(action('未收到邮件？',()=>N.dialog('未收到验证码邮件',E('div',{},mute('请核对邮箱拼写，并检查垃圾邮件或订阅邮件文件夹。验证码5分钟内有效，60秒后可重新获取；请使用最新验证码。'),action('联系客服',()=>{N.closeDialog();customerService();},'fa-link')),[{label:'知道了'}]),'fa-link'));
  }
- if(a.register||a.mode==='account')field('password','密码','password','6—32位密码');if(a.register)field('confirm','确认密码','password','请再次输入密码');
- const consent=E('div',{class:'fa-consent'}),check=E('input',{id:'fa-consent',type:'checkbox'});check.checked=!!a.values.agree;check.addEventListener('change',()=>a.values.agree=check.checked);consent.append(check,E('label',{for:'fa-consent'},'我已阅读并同意'),action('用户协议',()=>agreement('用户协议'),'fa-link'),text('span','和'),action('隐私政策',()=>agreement('隐私政策'),'fa-link'));body.append(consent,err);
+ field('password',recovering?'新密码':'密码','password','6—32位密码');if(usesCode)field('confirm','确认密码','password','请再次输入密码');
+ if(!recovering){const consent=E('div',{class:'fa-consent'}),check=E('input',{id:'fa-consent',type:'checkbox'});check.checked=!!a.values.agree;check.addEventListener('change',()=>a.values.agree=check.checked);consent.append(check,E('label',{for:'fa-consent'},'我已阅读并同意'),action('用户协议',()=>agreement('用户协议'),'fa-link'),text('span','和'),action('隐私政策',()=>agreement('隐私政策'),'fa-link'));body.append(consent);}
+ body.append(err);
  function submit(){
-  const v=a.values,fail=(message,key)=>{err.textContent=message;controls[key]?.focus();N.toast(message,'warning');},usesEmail=a.register||a.mode==='email';
-  if(!v.agree)return fail('请先阅读并同意用户协议和隐私政策');
-  if((a.register||a.mode==='account')&&!v.username?.trim())return fail('请输入用户名','username');
-  if((a.register||a.mode==='account')&&(String(v.password||'').length<6||v.password.length>32))return fail('密码须为6—32位','password');
-  if(usesEmail){if(!EA.valid(v.email))return fail('请输入正确的邮箱地址','email');v.email=EA.normalize(v.email);const message=EA.verify(a.request,v.email,purpose,v.code);if(message)return fail(message,'code');}
-  if(a.register&&v.confirm!==v.password)return fail('两次密码不一致','confirm');if(failed())return fail('网络开小差了，请稍后重试');
+  const v=a.values,fail=(message,key)=>{err.textContent=message;controls[key]?.focus();N.toast(message,'warning');};
+  if(!recovering&&!v.agree)return fail('请先阅读并同意用户协议和隐私政策');
+  if(!usesCode&&!v.identifier?.trim())return fail('请输入用户名或邮箱','identifier');
+  if(registering&&(!v.username?.trim()||v.username.includes('@')))return fail('请输入不含@符号的用户名','username');
+  if(String(v.password||'').length<6||v.password.length>32)return fail('密码须为6—32位','password');
+  if(usesCode){if(!EA.valid(v.email))return fail('请输入正确的邮箱地址','email');v.email=EA.normalize(v.email);const message=EA.verify(a.request,v.email,purpose,v.code);if(message)return fail(message,'code');if(v.confirm!==v.password)return fail('两次密码不一致','confirm');}
+  if(failed())return fail('网络开小差了，请稍后重试');
   f().accounts||=[];
-  if(a.register){if(f().accounts.some(x=>x.username===v.username.trim()))return fail('用户名已注册','username');if(f().accounts.some(x=>EA.normalize(x.email)===v.email))return fail('邮箱已注册，请直接登录','email');const registered={username:v.username.trim(),email:v.email,password:v.password,createdAt:new Date().toISOString()};N.identity.ensure(registered);f().accounts.push(registered);a.request.used=true;save();a.register=false;a.mode='account';a.values={username:v.username.trim(),agree:true};refresh();N.toast('注册成功，请登录','success');return;}
-  let account=f().accounts.find(x=>a.mode==='account'?x.username===v.username.trim()&&x.password===v.password:EA.normalize(x.email)===v.email);
-  if(a.mode==='account'&&!account)return fail('用户名或密码不正确','password');
-  if(a.mode==='email'&&!account){account={username:'jfmail_'+Date.now().toString(36),displayName:v.email.split('@')[0],email:v.email,createdAt:new Date().toISOString()};N.identity.ensure(account);f().accounts.push(account);}
-  if(usesEmail)a.request.used=true;N.identity.activate(account);a.values={};a.request=null;save();N.loginDone();N.toast('登录成功','success');
+  if(registering){
+   if(f().accounts.some(x=>x.username===v.username.trim()))return fail('用户名已注册','username');
+   if(f().accounts.some(x=>EA.normalize(x.email)===v.email))return fail('邮箱已注册，请直接登录','email');
+   const registered={username:v.username.trim(),email:v.email,password:v.password,createdAt:new Date().toISOString()};N.identity.ensure(registered);f().accounts.push(registered);a.request.used=true;save();change('login',{identifier:registered.email,agree:true});N.toast('注册成功，请登录','success');return;
+  }
+  if(recovering){
+   const account=f().accounts.find(x=>EA.normalize(x.email)===v.email);
+   if(!account)return fail('无法完成重置，请核对注册邮箱或联系客服','email');
+   if(v.password===account.password)return fail('新密码不能与原密码相同','password');
+   account.password=v.password;account.passwordChangedAt=new Date().toISOString();account.sessionVersion=(account.sessionVersion||0)+1;a.request.used=true;
+   if(f().activeAccountId===account.id)f().logged=false;
+   save();change('login',{identifier:account.email,agree:true});N.toast('密码已重置，请重新登录','success');return;
+  }
+  const identifier=v.identifier.trim(),isEmail=identifier.includes('@');
+  if(isEmail&&!EA.valid(identifier))return fail('请输入正确的邮箱地址','identifier');
+  const account=f().accounts.find(x=>isEmail?EA.normalize(x.email)===EA.normalize(identifier):x.username===identifier);
+  if(!account||!account.password||account.password!==v.password)return fail('用户名、邮箱或密码不正确','password');
+  N.identity.activate(account);a.values={};a.request=null;delete a.mode;save();N.loginDone();
  }
- function demoLogin(){a.register=false;a.mode='account';a.values={agree:true};a.request=null;N.identity.demo();N.loginDone();save();}
- body.append(action(a.register?'注册':'登录',submit,'primary fa-wide'),action('一键演示登录',demoLogin,'fa-wide fa-demo-login'),action(a.register?'已有账号？立即登录':'没有账号？立即注册',()=>{a.register=!a.register;refresh();},'fa-link fa-wide'));
- body.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.isComposing&&e.target.tagName==='INPUT'){e.preventDefault();submit();}});return overlay('DL1',a.register?'注册账号':p().expired||u().authExpired?'登录已过期':'登录',body,false,()=>N.cancelLogin());
+ function demoLogin(){a.register=false;a.recover=false;a.values={agree:true};a.request=null;N.identity.demo();N.loginDone();save();}
+ if(!usesCode)body.append(action('忘记密码？',()=>change('recover'),'fa-link'));
+ body.append(action(recovering?'重置密码':registering?'注册':'登录',submit,'primary fa-wide'));
+ if(!recovering)body.append(action('一键演示登录',demoLogin,'fa-wide fa-demo-login'));
+ body.append(action(usesCode?'返回登录':'没有账号？立即注册',()=>change(usesCode?'login':'register'),'fa-link fa-wide'));
+ body.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.isComposing&&e.target.tagName==='INPUT'){e.preventDefault();submit();}});
+ return overlay('DL1',title,body,false,()=>{a.register=false;a.recover=false;a.request=null;a.values={agree:true};N.cancelLogin();});
 }
 function overlay(code,title,content,center=false,cancel=back){let base;if(['SH6','SH7','DL5'].includes(code))base=wallet(code==='SH7'||code==='DL5'&&currentOrder()?.type==='vip');else if(['SH4','SH5','M05c'].includes(code))base=wheel();else if(code==='DL8')base=settings();else if(code==='DL6')base=following();else{const origin=N.state.history.slice().reverse().find(h=>h.terminal==='front'&&!/^(DL|SH|ST|T)/.test(h.route)&&h.route!=='M05c'),baseCode=p().returnCode&&!/^(DL|SH|ST|T)/.test(p().returnCode)?p().returnCode:origin?.route;const fallback=code==='DL3'&&p().kind==='draw'?'M05':p().postId?'C03':baseCode||'P01';base=N.frontContent?.(fallback)||N.frontAccount?.(fallback)||mine();}base.classList.add('fa-page','fa-overlay-base');const dim=E('div',{class:'fa-overlay'+(center?' centered':'')}),sheet=E('section',{class:center?'fa-dialog-card':'fa-sheet',role:'dialog','aria-modal':'true','aria-label':title});if(!center)sheet.append(E('div',{class:'fa-handle'}));const close=action('×',cancel,'fa-overlay-close');close.setAttribute('aria-label','关闭'+title);sheet.append(close);if(!['DL1','SH3'].includes(code))sheet.append(text('h2',title,'fa-sheet-title'));sheet.append(content);dim.append(sheet);base.append(dim);[...base.children].filter(n=>n!==dim).forEach(n=>n.inert=true);dim.addEventListener('click',event=>{if(event.target===dim)cancel();});return base;}
 function actions(...items){return E('div',{class:'fa-dialog-actions'},...items.map(([label,fn,cls])=>action(label,fn,cls||'')));}
@@ -4969,7 +4989,7 @@ add('AD16b','角色与权限','菜单与操作授权','form',[],['模块','查�
 add('AD17','用户管理','前端用户管理','list',[f('q','用户ID／账号／邮箱／昵称'),sel('status','账号状态',['全部','正常','封禁']),sel('vip','会员状态',['全部','有效VIP','已过期／非VIP'])],['用户','登录账号','邮箱','金币余额','VIP有效期','状态','注册时间','操作'],['查询','重置筛选','用户详情','封禁／解封'],['邮箱默认脱敏，具有查看完整邮箱权限才可展开，查看动作留痕。','按稳定用户ID关联订单、资产、权益及内容；不新增积分或解锁券体系。']);
 add('AD17a','用户管理','用户详情','detail',[],['基本资料','资产流水','权益记录','订单','内容与任务','登录记录'],['切换记录页签','封禁／解封','处理私信权限','查看订单','查看流水'],['用户详情各记录仅显示当前用户，不混入他人记录。','金币、VIP和私信卡分别核对；资产不提供无来源的直接改余额入口。'],'前端用户管理 → 用户详情');
 add('AD17b','用户管理','用户封禁／解封','form',[sel('operation','处理方式',['封禁','解封']),num('days','封禁天数（0为永久）',0,365,7),req('reason','处理原因','textarea',{maxLength:200})],[],['取消','确认处理'],['封禁与解封均要求原因，状态及处理历史同步。','账号封禁与单条内容下架、私信运营限制区分记录。'],'用户列表／用户详情 → 封禁／解封');
-add('AD17c','用户管理','账号与验证码策略','form',[num('passwordMin','用户密码最少位数',6,16,6),num('passwordMax','用户密码最多位数',16,64,32),num('failedLimit','后台连续登录失败阈值',3,20,5),num('lockMinutes','后台锁定分钟数',1,1440,15),num('sessionMinutes','后台无操作会话分钟数',5,480,30),num('nicknameMax','用户昵称最大字数',2,30,20)],[],['取消','保存'],['密码最大值不能小于最小值；后台员工密码另按8—32位执行。','玩家保留用户名密码与邮箱验证码登录，注册使用邮箱；后台员工使用唯一邮箱、密码和图形验证码登录。','邮箱格式、大小写归一、唯一性和用途校验统一执行；发送频控在邮件服务配置维护。']);
+add('AD17c','用户管理','账号与验证码策略','form',[num('passwordMin','用户密码最少位数',6,16,6),num('passwordMax','用户密码最多位数',16,64,32),num('failedLimit','后台连续登录失败阈值',3,20,5),num('lockMinutes','后台锁定分钟数',1,1440,15),num('sessionMinutes','后台无操作会话分钟数',5,480,30),num('nicknameMax','用户昵称最大字数',2,30,20)],[],['取消','保存'],['密码最大值不能小于最小值；后台员工密码另按8—32位执行。','玩家以用户名或邮箱加密码登录，统一输入框；注册使用邮箱验证码，找回密码验证注册邮箱后重置密码；后台员工使用唯一邮箱、密码和图形验证码登录。','邮箱格式、大小写归一、唯一性和用途校验统一执行；发送频控在邮件服务配置维护。']);
 add('AD18','资产与权益','金币资产流水','list',[f('q','流水号／用户／业务单号'),sel('kind','业务类型',['全部','充值到账','金币解锁','私信卡购买','金币打榜','转盘扣费','任务奖励','抽奖奖励','奖励追回'])],['流水号','用户','业务类型','关联单据','变动金币','变动前','变动后','时间','操作'],['查询','重置筛选','流水详情','关联用户','导出CSV'],['每笔流水有唯一业务键、变动前后余额；重复业务不得重复记账。','本页查询与导出不改资产；问题通过关联订单补单或奖励处理入口解决。']);
 add('AD18a','资产与权益','资产流水详情','detail',[],['流水编号','用户ID','资产类型','业务类型','来源单据','变动值','前后余额','状态','时间','操作人'],['查看用户','查看关联业务','返回流水列表'],['同一来源可追溯到对应订单、解锁、私信、打榜、抽奖或任务记录。','未找到关联对象时显示明确缺失状态，不跳到其他记录。'],'金币资产流水 → 流水详情');
 add('AD18b','资产与权益','用户权益记录','list',[f('q','用户／权益来源单号'),sel('kind','权益类型',['全部','VIP','私信卡'])],['用户','权益类型','来源单号','生效时间','到期时间','状态','操作'],['查询','用户详情','来源订单／私信开通记录'],['VIP与账号级私信卡分别记录；已购权益保留原有效期及来源。','邀请失效不退款，账号卡在有效期内跨会话共用。']);
@@ -4981,8 +5001,8 @@ add('AD20','日志与审计','后台操作日志','list',[f('q','操作人／对
 add('AD20a','日志与审计','操作日志详情','detail',[],['操作人','角色','模块','动作','对象','结果','IP','时间','字段','修改前','修改后'],['返回操作日志'],['仅展示当前日志对象；敏感字段仅显示已设置或已变更。'],'后台操作日志 → 详情');
 add('AD20b','日志与审计','后台登录日志','list',[f('q','账号／IP'),sel('result','登录结果',['全部','成功','失败','退出','会话失效'])],['账号','结果','原因','IP','设备','时间'],['查询','导出CSV'],['记录成功、失败、账号锁定、退出及会话失效；不记录密码和验证码。']);
 add('AD21','站点设置','站点基础设置','form',[req('brand','站点名称','text',{maxLength:20}),f('logo','Logo文件','file',{accept:'image/*'}),req('domain','访问域名','url'),sel('timezone','站点时区',['Asia/Shanghai']),sel('currency','结算币种',['CNY']),req('customer','客服入口名称'),txt('agreement','用户协议内容',10000),txt('privacy','隐私政策内容',10000)],[],['取消','保存','打开客户端版本配置'],['名称、Logo、协议、客服与既有客户端基础配置共用，避免两份配置互相覆盖。','保留人民币与北京时间；不新增多市场、多币种规则。']);
-add('AD22','邮件与通知','邮件服务配置','form',[req('provider','服务商标识'),sel('transport','发送方式',['SMTP','服务商API']),req('senderName','发件人名称'),req('senderEmail','发件邮箱','email',{maxLength:254}),f('replyTo','回复邮箱','email',{maxLength:254}),f('host','SMTP服务器'),num('port','SMTP端口',1,65535,465),sel('tls','连接加密',['TLS','STARTTLS']),f('smtpUser','SMTP账号'),f('smtpPassword','SMTP授权凭据','password',{help:'仅SMTP使用；留空保留原凭据'}),f('apiEndpoint','邮件API地址','url',{help:'仅服务商API使用；须HTTPS'}),f('accessKey','API服务凭据','password',{help:'留空保留原凭据'}),ck('enabled','启用邮件服务',true),num('validMinutes','验证码有效期（分钟）',1,30,5),num('resendSeconds','重发间隔（秒）',30,300,60),num('emailDaily','单邮箱每日次数',1,100,10),num('ipHourly','单IP每小时次数',1,1000,20),num('wrongLimit','验证码错误次数上限',1,10,5)],[],['取消','保存','查看邮件发送记录'],['SMTP和API按发送方式校验必要参数；凭据不回显，编辑留空保留原值。','发件和回复邮箱须格式有效；SMTP强制加密；API地址须HTTPS。','频率、重发、有效期及错误上限同时供玩家注册和邮箱登录使用，按邮箱与用途校验；站内业务通知渠道保持不变。']);
-add('AD22a','邮件与通知','邮件模板管理','list',[],['场景','模板名称','邮件标题','渠道模板编号','正文','状态','操作'],['编辑模板','启用／停用'],['保留邮箱登录、注册验证和找回密码模板场景；找回密码仅保留模板，本次不新增玩家找回密码入口。','验证码正文须包含{code}和{minutes}；标题、正文必填；启用及停用留痕，记录保存使用时模板快照。']);
+add('AD22','邮件与通知','邮件服务配置','form',[req('provider','服务商标识'),sel('transport','发送方式',['SMTP','服务商API']),req('senderName','发件人名称'),req('senderEmail','发件邮箱','email',{maxLength:254}),f('replyTo','回复邮箱','email',{maxLength:254}),f('host','SMTP服务器'),num('port','SMTP端口',1,65535,465),sel('tls','连接加密',['TLS','STARTTLS']),f('smtpUser','SMTP账号'),f('smtpPassword','SMTP授权凭据','password',{help:'仅SMTP使用；留空保留原凭据'}),f('apiEndpoint','邮件API地址','url',{help:'仅服务商API使用；须HTTPS'}),f('accessKey','API服务凭据','password',{help:'留空保留原凭据'}),ck('enabled','启用邮件服务',true),num('validMinutes','验证码有效期（分钟）',1,30,5),num('resendSeconds','重发间隔（秒）',30,300,60),num('emailDaily','单邮箱每日次数',1,100,10),num('ipHourly','单IP每小时次数',1,1000,20),num('wrongLimit','验证码错误次数上限',1,10,5)],[],['取消','保存','查看邮件发送记录'],['SMTP和API按发送方式校验必要参数；凭据不回显，编辑留空保留原值。','发件和回复邮箱须格式有效；SMTP强制加密；API地址须HTTPS。','频率、重发、有效期及错误上限同时供玩家注册验证和找回密码使用，按邮箱与用途校验；站内业务通知渠道保持不变。']);
+add('AD22a','邮件与通知','邮件模板管理','list',[],['场景','模板名称','邮件标题','渠道模板编号','正文','状态','操作'],['编辑模板','启用／停用'],['仅保留注册验证和找回密码模板场景；取消登录验证码模板。找回密码校验注册邮箱及验证码后重置密码，注销该玩家其他有效会话，返回登录。','验证码正文须包含{code}和{minutes}；标题、正文必填；启用及停用留痕，记录保存使用时模板快照。']);
 add('AD22b','邮件与通知','邮件发送记录','list',[f('q','收件邮箱／请求编号'),sel('status','发送状态',['全部','成功','失败','已过期'])],['请求编号','收件邮箱','用途','邮件标题','模板编号','状态','失败原因','发送时间','有效截止','重试次数','操作'],['查询','查看详情','重试失败发送'],['收件邮箱默认脱敏，完整值受用户管理的敏感资料权限控制；不保存明文验证码和服务凭据。','只重试仍有效且未使用、未被新请求替代的失败记录；成功、已过期记录不能重试；重试仍受邮箱日限、IP小时限和重发间隔限制。','重试沿用同请求和模板快照，不重复创建账号或生成推广码。']);
 add('AD22c','邮件与通知','系统通知模板','list',[],['业务场景','模板名称','标题','内容','必要通知','状态','操作'],['编辑模板','启用／停用'],['到账、审核结果等必要通知保持启用；模板变量按业务场景校验。','审核通过只增加任务进度，文案不能写自动到账。']);
 add('AD22d','邮件与通知','站内消息管理','list',[f('q','标题／消息编号'),sel('status','消息状态',['全部','草稿','已发送'])],['消息编号','标题','目标用户','状态','创建人','创建时间','操作'],['新建消息','编辑草稿','发送草稿','查看结果'],['消息先保存草稿，确认后发送；重复确认不得重复生成用户通知。','本轮仅立即发送与草稿，不新增完整定时调度平台。']);
@@ -5029,8 +5049,8 @@ function seed(){if(A().foundation)return;const a=A();const f=a.foundation={seque
  f.users.forEach((u,i)=>{const existing=a.dmPermissions.find(p=>p.name===u.name),pack=a.dmCards.find(c=>c.id===existing?.cardId)||a.dmCards[1];[['充值到账',pack.coins>200?1000:330,'JF-DEMO-'+i],['任务奖励',20,'TASK-CLAIM-'+i],['抽奖奖励',50,'DRAW-'+i],['金币解锁',-20,'UNLOCK-'+i],['私信卡购买',-pack.coins,'DM-CARD-'+i],['金币打榜',-100,'RANK-'+i]].forEach(([kind,delta,biz])=>addLedger(u.id,kind,delta,biz,'seed:'+biz));if(u.vipExpiresAt)f.rights.push({id:'RIGHT-VIP-'+i,userId:u.id,kind:'VIP',source:'VIP-ORDER-'+i,start:new Date(Date.now()-86400000).toISOString(),expiresAt:u.vipExpiresAt,status:'有效'});f.rights.push({id:'RIGHT-DM-'+i,userId:u.id,kind:'私信卡',source:'DM-CARD-'+i,start:stamp(),expiresAt:existing?Date.parse(existing.expires):Date.now()+pack.days*86400000,status:existing?.status||'有效'});if(!existing)a.dmPermissions.push({id:'PERMISSION-FOUNDATION-'+i,userId:u.id,name:u.name,cardId:pack.id,status:'有效',expires:new Date(Date.now()+pack.days*86400000).toISOString(),blocked:false});});
  a.orders.forEach(o=>{const user=f.users.find(u=>u.name===o.user);if(user)o.userId=user.id;});
  f.channels=[{id:'PAY-WX',name:'微信支付',method:'微信',merchantId:'DEMO100001',appId:'wx-demo-app',notifyUrl:'https://jf.example.com/pay/wechat/callback',terminals:'APP,H5',status:'启用',secret:'mock-key',remark:'演示支付配置'},{id:'PAY-ALI',name:'支付宝',method:'支付宝',merchantId:'DEMO2088001',appId:'ali-demo-app',notifyUrl:'https://jf.example.com/pay/alipay/callback',terminals:'APP,H5',status:'启用',secret:'mock-key',remark:''}];
- f.mailTemplates=['邮箱登录','注册验证','找回密码'].map((scene,i)=>({id:'MAIL-TPL-'+i,scene,name:scene+'验证码',subject:'飓风短剧 '+scene+'验证码',providerId:'DEMO-MAIL-'+i,body:'您正在进行'+scene+'，验证码为{code}，{minutes}分钟内有效。请勿向他人泄露。',status:'启用'}));
- f.mailLogs=Array.from({length:12},(_,i)=>({id:'MAIL-LOG-'+i,email:f.users[i%f.users.length].email,scene:f.mailTemplates[i%3].scene,subject:f.mailTemplates[i%3].subject,bodySnapshot:f.mailTemplates[i%3].body,templateId:f.mailTemplates[i%3].providerId,status:i===1?'失败':i>5?'已过期':'成功',reason:i===1?'邮件服务暂时不可用':'',time:new Date(Date.now()-i*60000).toISOString(),expiresAt:Date.now()+(5-i)*60000,attempts:1,used:false,superseded:false}));
+ f.mailTemplates=['注册验证','找回密码'].map((scene,i)=>({id:'MAIL-TPL-'+i,scene,name:scene+'验证码',subject:'飓风短剧 '+scene+'验证码',providerId:'DEMO-MAIL-'+i,body:'您正在进行'+scene+'，验证码为{code}，{minutes}分钟内有效。请勿向他人泄露。',status:'启用'}));
+ f.mailLogs=Array.from({length:12},(_,i)=>({id:'MAIL-LOG-'+i,email:f.users[i%f.users.length].email,scene:f.mailTemplates[i%f.mailTemplates.length].scene,subject:f.mailTemplates[i%f.mailTemplates.length].subject,bodySnapshot:f.mailTemplates[i%f.mailTemplates.length].body,templateId:f.mailTemplates[i%f.mailTemplates.length].providerId,status:i===1?'失败':i>5?'已过期':'成功',reason:i===1?'邮件服务暂时不可用':'',time:new Date(Date.now()-i*60000).toISOString(),expiresAt:Date.now()+(5-i)*60000,attempts:1,used:false,superseded:false}));
  f.noticeTemplates=[['到账通知','充值到账','充值成功，金币已到账。',true],['审核结果','帖子审核通过','帖子审核通过，任务进度已更新，请主动领取奖励。',true],['评论审核','评论审核通过','评论审核通过，任务进度已更新。',true],['会员提醒','VIP即将到期','你的VIP将于{date}到期，可前往续费。',false],['奖品发货','奖品已发货','你的奖品已发货，请查看物流。',true],['私信邀请','私信邀请失效','邀请已失效，账号私信卡费用不退，可重新邀请。',true],['咨询回复','客服已回复','你的咨询已有回复，请查看详情。',true]].map(([scene,title,body,required],i)=>({id:'NOTICE-TPL-'+i,name:scene,scene,title,body,required,status:'启用'}));
  f.messages=[{id:'MSG-500',title:'欢迎使用飓风短剧',body:'发现精彩内容，欢迎分享你的观剧体验。',audience:'全部用户',userIds:'',status:'草稿',creator:'admin',createdAt:stamp()}];f.deliveries=[{id:'DELIVERY-1',userId:f.users[0].id,scene:'到账通知',businessId:a.orders[0].id,title:'金币已到账',body:'充值成功，金币已到账。',status:'成功',reason:'',time:stamp(),sourceKey:'seed-delivery-1',attempts:1},{id:'DELIVERY-2',userId:f.users[1].id,scene:'咨询回复',businessId:'CS-001',title:'客服已回复',body:'请查看咨询处理结果。',status:'失败',reason:'消息服务暂时不可用',time:stamp(),sourceKey:'seed-delivery-2',attempts:1}];
  const originalUnshift=a.log.unshift.bind(a.log);a.log.unshift=function(...entries){for(const e of entries){const actor=current();e.operator=actor?.username||'系统';e.module=e.module||resource(S.route);e.result||='成功';e.before=scrub(U().pendingBefore);e.after=scrub(U().pendingAfter);audit(e.module,e.action,{id:e.recordId,name:e.name},e.before,e.after);syncBusiness(e);}return originalUnshift(...entries);};
