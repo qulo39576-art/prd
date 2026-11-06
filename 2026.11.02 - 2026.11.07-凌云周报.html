@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>项目管理周报（2026.11.02 - 2026.11.07）</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f7f9fa;
+        }
+        h1 {
+            color: #1e3a8a;
+            border-bottom: 2px solid #1e3a8a;
+            padding-bottom: 10px;
+            text-align: center;
+        }
+        h2 {
+            color: #2563eb;
+            margin-top: 30px;
+            border-left: 4px solid #2563eb;
+            padding-left: 10px;
+        }
+        h3 {
+            color: #1d4ed8;
+            margin-top: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background-color: #fff;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        th, td {
+            border: 1px solid #e2e8f0;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #f1f5f9;
+            color: #1e293b;
+            font-weight: 600;
+        }
+        tr:nth-child(even) {
+            background-color: #f8fafc;
+        }
+        ul {
+            padding-left: 20px;
+        }
+        li {
+            margin-bottom: 8px;
+        }
+        .highlight {
+            font-weight: bold;
+            color: #1e3a8a;
+        }
+        .risk-high {
+            color: #dc2626;
+            font-weight: bold;
+        }
+        .risk-medium {
+            color: #d97706;
+            font-weight: bold;
+        }
+        .risk-low {
+            color: #059669;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>📝 项目管理周报（2026.11.02 - 2026.11.07）</h1>
+
+    <h2>一、 首期模块清单与研发矩阵</h2>
+    
+    <h3>1. 终端发布范围界定</h3>
+    <ul>
+        <li><span class="highlight">H5端 / PC (Web)端 / 管理后台</span>：全量纳入首期发布范围。</li>
+        <li><span class="highlight">APP端</span>：全量纳入首期发布范围。排期表显示“APP/H5”共享产品线逻辑且APP端（下载管理等专用模块）已全线投入开发，测试已同步进场，故本期同步交付。</li>
+    </ul>
+
+    <h3>2. 核心模块研发矩阵与估时看板</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>产品端</th>
+                <th>核心需求模块</th>
+                <th>后端负责人</th>
+                <th>前端/APP负责人</th>
+                <th>组织估时 (人天)</th>
+                <th>截止11.07剩余工作量</th>
+                <th>核心上下游依赖关系</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>APP/H5</strong></td>
+                <td>首页/频道导航等9项</td>
+                <td>亮亮</td>
+                <td>云止 / 清远</td>
+                <td>后端: 6 | 前端: 7 | APP: 9</td>
+                <td>后端: 0 | 前端: 0 | APP: 6</td>
+                <td>依赖Go后端接口支持；APP端阻断后续社区及个人资料回显。</td>
+            </tr>
+            <tr>
+                <td><strong>APP/H5</strong></td>
+                <td>ACG内容与阅读</td>
+                <td>亮亮</td>
+                <td>云止 / 拉尔夫</td>
+                <td>后端: 4 | 前端: 6 | APP: 9</td>
+                <td>后端: 0 | 前端: 0 | APP: 6</td>
+                <td>严重依赖后台“视频/漫画/小说作品”的数据上架与内容池配置。</td>
+            </tr>
+            <tr>
+                <td><strong>APP/H5</strong></td>
+                <td>社区模块 (首页/发布等)</td>
+                <td>亮亮</td>
+                <td>云止 / 林天舒</td>
+                <td>后端: 2 | 前端: 7 | APP: 10</td>
+                <td>后端: 0 | 前端: 0 | APP: 6</td>
+                <td>强依赖后台“帖子与评论审核”及“话题管理”的接口联调。</td>
+            </tr>
+            <tr>
+                <td><strong>APP/H5</strong></td>
+                <td>我的/资产、交易与权益</td>
+                <td>壹白 / 亮亮</td>
+                <td>云止 / 拉尔夫</td>
+                <td>后端: 8 | 前端: 7 | APP: 9</td>
+                <td>后端: 0 | 前端: 0 | APP: 6</td>
+                <td>强依赖后台“金币与会员/订单补单/支付渠道”的闭环测试。</td>
+            </tr>
+            <tr>
+                <td><strong>Web</strong></td>
+                <td>PC全站导航与内容推荐</td>
+                <td>亮亮</td>
+                <td>云止 / 魏新</td>
+                <td>后端: 6 | PC端: 6</td>
+                <td>后端: 0 | PC端: 0</td>
+                <td>页面搜索入口聚焦顶部唯一搜索框；依赖PC端样式走查。</td>
+            </tr>
+            <tr>
+                <td><strong>Web</strong></td>
+                <td>独立模块 (充值/转盘/消息)</td>
+                <td>壹白</td>
+                <td>云止 / 魏新 / 林天舒</td>
+                <td>后端: 6 | PC端: 16</td>
+                <td>后端: 0 | PC端: 7</td>
+                <td>采用桌面主导航独立打开；依赖后台Web页脚配置的数据注入。</td>
+            </tr>
+            <tr>
+                <td><strong>后台</strong></td>
+                <td>经营数据与基础配置</td>
+                <td>壹白 / 亮亮</td>
+                <td>大童</td>
+                <td>后端: 8 | 后台: 10</td>
+                <td>后端: 0 | 后台: 0</td>
+                <td>视频/合集/推荐位测试必须在11.07前封板以承接前台联调。</td>
+            </tr>
+            <tr>
+                <td><strong>后台</strong></td>
+                <td>交易/对账与合规审核</td>
+                <td>壹白 / 亮亮</td>
+                <td>大童</td>
+                <td>后端: 9 | 后台: 18</td>
+                <td>后端: 0 | 后台: 0</td>
+                <td>短信服务与验证码流水直接阻断前台登录注册流的合规测试。</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>二、 关键排期节点与提测控制</h2>
+    <ul>
+        <li><strong>第一批提测（已执行）</strong>：<span class="highlight">2026年11月4日</span>。包含APP/H5首页导航前端构建，以及后台账号权限、视频与合集、频道分类等配置模块。</li>
+        <li><strong>第二批提测（进行中）</strong>：<span class="highlight">2026年11月7日 - 11月9日</span>。包含PC端全站导航、社区首页及六大独立服务页面，以及后台工作台数据看板、Web页脚配置等。</li>
+        <li><strong>第三批提测（APP冲刺）</strong>：<span class="highlight">2026年11月10日</span>。包含APP端全量包交付测试。</li>
+        <li><strong>集中回归验收节点</strong>：<span class="highlight">2026年11月11日 - 11月13日</span>进行全量SIT集中回归测试；<span class="highlight">2026年11月13日</span>由产品经理杰克进行UAT最终验收签字。</li>
+    </ul>
+
+    <h2>三、 代码质量治理 (Code Review)</h2>
+    <ul>
+        <li><strong>CR 核心范围</strong>：亮亮负责的APP下载并发空间及离线授权校验逻辑；壹白负责的支付回调、渠道查单补单、超时退款及资产流水防刷对账逻辑。</li>
+        <li><strong>技术评审人</strong>：后端负责人兼架构师。</li>
+        <li><strong>合并准入条件</strong>：CR必须达到“0阻断性异常 / 0核心逻辑漏洞”；SonarQube静态扫描重复率 &lt; 5%，核心业务代码单测覆盖率 ≥ 85%。</li>
+        <li><strong>整改截止时间</strong>：<span class="highlight">2026年11月9日 18:00前</span>。</li>
+    </ul>
+
+    <h2>四、 项目当前风险看板与交付冲击</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>风险类别</th>
+                <th>风险事件具体描述</th>
+                <th>对应负责人</th>
+                <th>预期解决时间</th>
+                <th>交付影响评估</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>接口/联调风险</strong></td>
+                <td>后端接口已封板，但Web前端和APP端本周属于密集出图期。由于多端交互差异大，易在联调期暴露接口字段不匹配风险。</td>
+                <td>云止 / 壹白</td>
+                <td>2026.11.08</td>
+                <td><span class="risk-medium">中度冲击</span>。可能压缩PC提测首轮执行时间。</td>
+            </tr>
+            <tr>
+                <td><strong>环境/权限风险</strong></td>
+                <td>后台涉及严格的菜单及操作级权限控制。多端混合测试易因角色越权或环境隔离不全导致假性Bug。</td>
+                <td>大童 / 左一</td>
+                <td>2026.11.08</td>
+                <td><span class="risk-low">轻度冲击</span>。需输出“研发/测试”环境权限白名单底表。</td>
+            </tr>
+            <tr>
+                <td><strong>测试交接风险</strong></td>
+                <td>测试模块高度交叉（如跨前台弹窗到后台交易），提测节点混乱极易产生漏测或重复测试。</td>
+                <td>魏新</td>
+                <td>2026.11.07</td>
+                <td><span class="risk-high">高度冲击</span>。需于11.07前输出用例交叉矩阵明确边界。</td>
+            </tr>
+            <tr>
+                <td><strong>App 资源风险</strong></td>
+                <td>客户端开发周期拉得最长，同时需兼顾离线授权、强制更新等系统底层配置，平台差异性大。</td>
+                <td>清远 / 拉尔夫</td>
+                <td>2026.11.11</td>
+                <td><span class="risk-high">极高冲击</span>。稍有延误将导致整体无法闭环，必要时抽调后端协助联调。</td>
+            </tr>
+        </tbody>
+    </table>
+
+</body>
+</html>
